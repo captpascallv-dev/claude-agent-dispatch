@@ -1,0 +1,6 @@
+jobs/
+executors.json
+.env
+.env.*
+!.env.example
+*.log
