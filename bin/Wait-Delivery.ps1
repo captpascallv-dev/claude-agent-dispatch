@@ -5,7 +5,7 @@ param(
     [Parameter(Mandatory = $true)][string]$JobDir,
     [string[]]$TerminalFiles = @(),   # executor-native end markers, e.g. <state>\jobs\<id>\receipt.json
     [int]$ProcessId = 0,              # optional executor PID; its exit without READY counts as terminal
-    [double]$TimeoutMinutes = 720,
+    [double]$TimeoutMinutes = 720, # direct/terminal use. Dispatch and Pending pass 29: Claude Code background commands are force-stopped around 30 minutes (2026-10-02).
     [int]$IntervalSeconds = 15
 )
 

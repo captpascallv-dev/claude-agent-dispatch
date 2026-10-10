@@ -19,5 +19,10 @@
 在 `<OUTBOX>` 下：
 1. 产物文件：<列出文件名与格式>
 2. `REPORT.md`：做了什么、产物清单、自查结果、未完成项和疑问。
-3. **最后一步**写 `READY.json`：`{"status":"delivered"}`；做不下去就写 `{"status":"blocked","reason":"..."}`。
+3. **最后一步**写 `READY.json`。下面三个字段必须有，名字不能改；任务专属数字（条数、字数等）可以加在后面：
+   `{"status":"completed|blocked|failed","deliverables":["相对工作目录的路径"],"notes":"一句话"}`
+   - `completed`：卡里要求的都做完了。
+   - `blocked`：做不下去。`notes` 写原因。
+   - `failed`：做了，但结果不能用。`notes` 写原因。
+   受阻或失败也要写 `REPORT.md` 和 `READY.json`，不要静默退出，也不要把没完成写成 `completed`。
    READY.json 必须最后写——守候脚本一看到它就会叫醒 Lead 验收。

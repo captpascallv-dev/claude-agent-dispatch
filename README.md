@@ -18,18 +18,19 @@ Claude(Lead) ──写任务卡──> Dispatch.ps1 ──后台隐藏进程─�
 - 派单后 Claude 结束本轮，不占上下文、不花额度等待。
 - 守候脚本只做文件存在性检查（每 20 秒一次），不调用任何模型。
 - 执行者通过后台进程启动；会话重启后用 `Pending.ps1` 重新挂守候。能否跨宿主退出继续存活取决于启动环境，见下方限制。
+- Claude Code 的后台命令大约 30 分钟会被强制停掉（2026-10-02 实测）。派单打出的守候最多 29 分钟一轮；这一轮以退出码 2 结束而执行者还在，就再挂一轮。
 
 ## 目录
 
 ```
-bin/Dispatch.ps1        派单：按 executors.json 组装命令，后台启动，输出 WATCH 命令
+bin/Dispatch.ps1        派单：按 executors.json 组装命令，后台启动，输出最多 29 分钟一轮的 WATCH 命令
 bin/Run-Agent.ps1       后台进程里实际执行 agent CLI，写 agent.log / exit_code.txt
 bin/Wait-Delivery.ps1   守候：READY.json 出现→退出码0；执行者没交卷就退出→4；超时→2
-bin/Pending.ps1         列出未交卷任务并给出重挂守候命令
+bin/Pending.ps1         列出未交卷任务并给出重挂守候命令（跳过放了 CLOSED.txt 的任务）
 executors.example.json  执行者配置样例（复制为 executors.json 后按需修改）
 templates/TASK_CARD.md  任务卡模板（含交卷约定）
 CLAUDE.snippet.md       放进 CLAUDE.md 的一段说明，让 Claude 知道怎么用
-jobs/<id>/              每次派单的记录：job.json、spec.json、任务卡副本、agent.log
+jobs/<id>/              每次派单的记录：job.json、spec.json、任务卡副本、agent.log。放 CLOSED.txt 表示不再重挂守候
 ```
 
 ## 安装
@@ -71,7 +72,22 @@ jobs/<id>/              每次派单的记录：job.json、spec.json、任务卡
 
 ## 交卷约定
 
-任务卡里必须写明：产物写进交卷目录，写 `REPORT.md`，**最后一步**写 `READY.json`（`{"status":"delivered"}` 或 `{"status":"blocked","reason":"..."}`）。守候脚本只认 `READY.json`；执行者进程结束了却没写它，守候会以退出码 4 叫醒 Lead，由 Lead 查 `jobs/<id>/agent.log`。
+任务卡里必须写明：产物写进交卷目录，写 `REPORT.md`，**最后一步**写 `READY.json`。统一格式：
+
+```json
+{"status":"completed|blocked|failed","deliverables":["相对工作目录的路径"],"notes":"一句话"}
+```
+
+三个字段必须在，名字不能改。任务专属数字（条数、字数等）可以加在后面。`blocked` 和 `failed` 也要写 `REPORT.md` 和 `READY.json`，不要静默退出，不要把没完成写成 `completed`。
+
+守候脚本只认交卷目录里有没有 `READY.json`，不判 status 对不对：文件一出现就以退出码 0 叫醒 Lead。执行者进程结束了却没写它，守候以退出码 4 叫醒，由 Lead 查 `jobs/<id>/agent.log`。
+
+## Lead 怎么验收
+
+- 核对实际产物，不要只信 `REPORT.md` 的自报。
+- **越界检查**：对照任务卡看执行者有没有扩大范围，有没有加任务卡没要求的测试、工具或文件。有就写进验收，并决定是否退回。
+- **量级**：派单时写明预期（大概多久、用哪个执行者的额度、改动规模）；验收时报实际值。两者差得多，要说明原因。
+- 退修换一个新的交卷目录和新任务卡，不覆盖旧交卷。
 
 ## 安全提醒
 
@@ -91,14 +107,15 @@ jobs/<id>/              每次派单的记录：job.json、spec.json、任务卡
 | PI | — | gpt-6-luna / max（openai-codex） | 通过 | 19 秒 |
 | DeepSeek DSH | — | DSH 默认设置 | 通过 | 4 秒 |
 
-测试任务：读任务卡 → 写一行中文 REPORT.md → 写 READY.json；五个并行派出，守候脚本全部以退出码 0 叫醒。这只证明链路通，不代表复杂任务的质量。
+测试任务：读任务卡 → 写一行中文 REPORT.md → 写 READY.json；五个并行派出，守候脚本全部以退出码 0 叫醒。这只证明链路通，不代表复杂任务的质量。2026-10-11 更新文档时没有重跑上表，数字仍是 2026-09-30 那一次。
 
 ## 当前限制
 
-- 当前实测环境仅为 Windows 11 / PowerShell 7.6；Linux、macOS 和完整宿主退出后的存活未验证。`Start-Process` 不保证脱离宿主的 Windows Job Object，后台进程或守候可能受宿主生命周期影响。
+- 后台命令大约 30 分钟会被强制停掉。这是 2026-10-02 在 Claude Code 后台任务上看到的，不是把上面的链路烟测重跑了一遍。`Dispatch.ps1` 和 `Pending.ps1` 打出的守候因此最多 29 分钟：到点以退出码 2 退出并叫醒 Lead。执行者进程还在，就再挂一轮，只看进程还在不在、交卷目录里有没有 `READY.json`，不读日志正文。`Wait-Delivery.ps1` 自己的默认超时仍是 720 分钟，给直接在终端里跑、不受这个后台上限约束的情况用。一条命令挂数小时，在 Claude Code 后台任务里站不住；多轮重挂能不能覆盖更长的任务，没有另做实测。
+- 当前实测环境仅为 Windows 11 / PowerShell 7.6；Linux、macOS 和完整宿主退出后的存活未验证。后台进程不保证脱离宿主的 Windows Job Object，守候或执行者可能随宿主退出一起停。宿主关掉时守候会停，交卷文件照常落盘，会话回来后用 `Pending.ps1` 重挂。
 - `Pending.ps1` 恢复的是本地守候，不会自动重跑执行任务，也不是持久通知服务。必须由 Claude Code 当前会话以后台工具方式运行守候，退出通知才能回到该会话。
 - 守候超时只结束守候，不终止执行者。PID 检查目前没有绑定进程启动时间；长时间恢复时应核对任务和日志，避免把复用的 PID 当成原任务。
-- READY 文件存在就会唤醒 Lead，包括 blocked 或无法解析的文件；退出码 0 表示发现交卷标记，不能替代结果验收。执行器退出或守候超时同样需要 Lead 查明。
+- `READY.json` 存在就会唤醒 Lead，包括 `blocked`、`failed` 或无法解析的文件；退出码 0 表示发现交卷标记，不能替代结果验收。执行器退出或守候超时同样需要 Lead 查明。
 
 ## License
 
