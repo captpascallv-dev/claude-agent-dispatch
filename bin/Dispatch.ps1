@@ -95,11 +95,12 @@ $spec | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $jobDir 'spec.json') -E
 $runner = Join-Path $PSScriptRoot 'Run-Agent.ps1'
 # ArgumentList on ProcessStartInfo passes each argument separately, so a path with spaces
 # is not split and does not depend on quotes embedded in the string.
+# UseShellExecute=$true on purpose: with $false the runner inherits this script's stdout pipe,
+# and the caller (e.g. a Claude Code tool call) blocks until the executor finishes.
 $startInfo = [Diagnostics.ProcessStartInfo]::new()
 $startInfo.FileName = (Get-Command pwsh -ErrorAction Stop).Source
-$startInfo.UseShellExecute = $false
-$startInfo.CreateNoWindow = $true
-if ($IsWindows) { $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden }
+$startInfo.UseShellExecute = $IsWindows
+if ($IsWindows) { $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden } else { $startInfo.CreateNoWindow = $true }
 foreach ($arg in @('-NoProfile', '-File', $runner, '-JobDir', $jobDir)) {
     [void]$startInfo.ArgumentList.Add($arg)
 }
