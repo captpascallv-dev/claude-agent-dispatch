@@ -1,5 +1,9 @@
 # claude-agent-dispatch
 
+> **已迁移 / Moved:** 本仓库已并入 **[agent-baton](https://github.com/captpascallv-dev/agent-baton)**，后续更新都在那里。原来的派单和守候脚本在 [`agent-baton/claude/`](https://github.com/captpascallv-dev/agent-baton/tree/main/claude)；那边还新增了 Lead 之间的信箱（`mailbox/`）、通用 ACP 客户端（`acp/`）和 Codex App 的叫醒插件（`codex/`）。本仓库只读归档。
+>
+> This repository has been merged into [agent-baton](https://github.com/captpascallv-dev/agent-baton) and is archived. The dispatch and wake scripts live in `claude/` there.
+
 让 Claude Code 当 Lead，把活派给其他 agent CLI（Codex、Cursor、Grok Build、PI、DeepSeek DSH……），执行者交卷时**自动叫醒** Claude 验收。不需要模型轮询，也不需要中转服务。
 
 > Let Claude Code act as a lead: dispatch task cards to other agent CLIs (Codex, Cursor, Grok Build, PI, DeepSeek DSH, …) as detached processes, and get woken up automatically when the work is delivered — no model polling, no relay service.
